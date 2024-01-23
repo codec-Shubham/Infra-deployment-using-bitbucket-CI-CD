@@ -1,0 +1,95 @@
+image: scalr/opentofu:1.6.0-preview
+
+pipelines:
+  custom:
+    dev:
+      - variables:
+        - name: Environment
+          default: "dev"
+          allowed-values:
+            - dev
+            
+        - name: Resource
+          default: "ec2"
+          allowed-values:
+            - "ec2"
+            - "vpc"
+        
+        - name: CodeScanning
+          default: "Yes"
+          allowed-values:
+            - "Yes"
+            - "No"
+            
+        - name: Action
+          default: "plan"
+          allowed-values:
+            - "plan"
+            - "apply"
+            - "destroy"
+      - step:
+          name: CodeScanning
+          script:
+            - if [ "${CodeScanning}" == Yes ]; then
+                wget -o /dev/null -O /usr/bin/tfsec https://github.com/liamg/tfsec/releases/latest/download/tfsec-linux-amd64;
+                chmod +x /usr/bin/tfsec;
+                tfsec --version;
+                export PATH=$PATH:$(pwd);
+                pwd;
+                cp script/script.sh /opt/atlassian/pipelines/agent/build/;
+                ./script.sh;
+            - elif [ "${CodeScanning}" == No ]; then
+                echo "Skipping Code Scanning.Continue Pipeline...."
+
+             fi;
+          
+            
+      - step: 
+          name: Plan
+          script:
+            - if [ "${Resource}" == ec2 ] && [ "${Action}" == plan ]; then
+                cd project/ec2;
+                tofu init;
+                tofu plan;
+            - elif [ "${Resource}" == vpc ] && [ "${Action}" == plan ]; then
+                cd project/vpc;
+                tofu init;
+                tofu plan;
+                
+              fi;
+          
+      - step: 
+      
+          name: Apply
+          script:
+            - if [ "${Resource}" == ec2 ] && [ "${Action}" == apply ]; then
+                cd project/ec2;
+                tofu init;
+                tofu apply -auto-approve;
+            - elif [ "${Resource}" == vpc ] && [ "${Action}" == apply ]; then
+                cd project/vpc;
+                tofu init;
+                tofu apply -auto-approve;
+                
+              fi;
+                
+      - step: 
+      
+          name: Destroy
+          script:
+            - if [ "${Resource}" == ec2 ] && [ "${Action}" == destroy ]; then
+                cd project/ec2;
+                tofu init;
+                tofu destroy -auto-approve;
+            - elif [ "${Resource}" == vpc ] && [ "${Action}" == destroy ]; then
+                cd project/vpc;
+                tofu init;
+                tofu destroy -auto-approve;
+                
+              fi;
+          
+          
+      
+      
+     
+ 
